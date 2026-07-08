@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loglens</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f111a;
+      --bg-panel: #1a1d27;
+      --bg-hover: #262a38;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+      
+      --color-user: #3b82f6;      /* Blue */
+      --color-model: #10b981;     /* Green */
+      --color-system: #f59e0b;    /* Yellow */
+      --color-tool: #8b5cf6;      /* Purple */
+      --color-error: #ef4444;     /* Red */
+      
+      --json-bg: #0d0f14;
+      --json-text: #a6accd;
+      --json-key: #82aaff;
+      --json-string: #c3e88d;
+      --json-number: #f78c6c;
+      --json-boolean: #ff9cac;
+    }
+
+    [data-theme="light"] {
+      --bg-dark: #f8fafc;
+      --bg-panel: #ffffff;
+      --bg-hover: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      
+      --color-user: #2563eb;
+      --color-model: #059669;
+      --color-system: #d97706;
+      --color-tool: #7c3aed;
+      --color-error: #dc2626;
+
+      --json-bg: #f8fafc;
+      --json-text: #334155;
+      --json-key: #0284c7;
+      --json-string: #16a34a;
+      --json-number: #ea580c;
+      --json-boolean: #e11d48;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    header {
+      background: var(--bg-panel);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    h1 { font-size: 1.2rem; font-weight: 600; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; color: transparent; display: flex; align-items: center; gap: 0.5rem; }
+    
+    .live-indicator {
+      display: none;
+      width: 8px;
+      height: 8px;
+      background-color: var(--color-error);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--color-error);
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.5; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .controls { display: flex; gap: 1rem; align-items: center; }
+
+    button, select, input[type="file"] {
+      background: var(--bg-hover);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      outline: none;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    
+    button:hover, select:hover { background: var(--border-color); }
+    
+    .btn-primary {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--color-user);
+      border-color: rgba(59, 130, 246, 0.3);
+      font-weight: 500;
+    }
+    .btn-primary:hover {
+      background: rgba(59, 130, 246, 0.2);
+    }
+    .btn-primary.active-sync {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-model);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-secondary {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--color-tool);
+      border-color: rgba(139, 92, 246, 0.3);
+      font-weight: 500;
+    }
+    .btn-secondary:hover {
+      background: rgba(139, 92, 246, 0.2);
+    }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 350px;
+      flex-shrink: 0;
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .resizer {
+      width: 4px;
+      background: var(--border-color);
+      cursor: col-resize;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+      z-index: 5;
+    }
+    
+    .resizer:hover, .resizer.dragging {
+      background: var(--color-user);
+    }
+
+    .message-item {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      border-left: 4px solid transparent;
+      cursor: pointer;
+      transition: background-color 0.2s, border-left-color 0.2s;
+    }
+
+    .message-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .message-item.active {
+      background: var(--bg-hover);
+      border-left: 4px solid var(--color-user);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-index {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge.user { background: rgba(59, 130, 246, 0.2); color: var(--color-user); border: 1px solid rgba(59,130,246,0.3); }
+    .badge.model { background: rgba(16, 185, 129, 0.2); color: var(--color-model); border: 1px solid rgba(16,185,129,0.3); }
+    .badge.system { background: rgba(245, 158, 11, 0.2); color: var(--color-system); border: 1px solid rgba(245,158,11,0.3); }
+    .badge.tool { background: rgba(139, 92, 246, 0.2); color: var(--color-tool); border: 1px solid rgba(139,92,246,0.3); }
+    .badge.error { background: rgba(239, 68, 68, 0.2); color: var(--color-error); border: 1px solid rgba(239,68,68,0.3); }
+
+    .message-snippet {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .main-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg-dark);
+      transition: background-color 0.3s;
+    }
+
+    .detail-panel {
+      padding: 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .empty-state {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .detail-header { margin-bottom: 1.5rem; }
+    
+    .detail-content {
+      background: var(--bg-panel);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 2rem;
+      white-space: pre-wrap;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .json-view {
+      background: var(--json-bg);
+      color: var(--json-text);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+    
+    .json-key { color: var(--json-key); }
+    .json-string { color: var(--json-string); }
+    .json-number { color: var(--json-number); }
+    .json-boolean { color: var(--json-boolean); }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(2px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: var(--bg-dark);
+      padding: 2rem; border-radius: 12px;
+      width: 750px; max-height: 85vh;
+      display: flex; flex-direction: column;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .modal-content h2 {
+      margin-bottom: 0.5rem;
+      font-size: 1.25rem;
+    }
+    .modal-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    .conv-list {
+      overflow-y: auto; flex: 1; margin-bottom: 1.5rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+    .conv-item {
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);
+      cursor: pointer; display: flex; justify-content: space-between;
+      align-items: center; transition: background-color 0.2s;
+    }
+    .conv-item:last-child { border-bottom: none; }
+    .conv-item:hover { background: var(--bg-hover); }
+    .conv-title { font-weight: 500; margin-bottom: 0.25rem; color: var(--text-main); }
+    .conv-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; gap: 1rem; }
+    
+    .loading-spinner {
+      display: flex; flex-direction: column; align-items: center; gap: 1rem;
+      padding: 3rem; color: var(--text-muted);
+    }
+    .spinner {
+      width: 30px; height: 30px; border: 3px solid var(--border-color);
+      border-top-color: var(--color-user); border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Loglens <div class="live-indicator" id="liveIndicator" title="Live Sync Active"></div></h1>
+    <div class="controls">
+      <button id="themeToggle" title="Toggle Light/Dark Theme">
+        <svg id="moonIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg id="sunIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <select id="typeFilter">
+        <option value="ALL">All Types</option>
+      </select>
+      
+      <!-- Modern API Buttons -->
+      <div id="modernButtons" style="display:none; gap:1rem;">
+        <button id="brainDirBtn" class="btn-secondary" title="Open the entire brain directory to select from previous sessions">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <span>Select Brain Folder</span>
+        </button>
+        <button id="liveOpenBtn" class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg> 
+          <span>Open Single File</span>
+        </button>
+      </div>
+
+      <!-- Fallback API Input -->
+      <input type="file" id="fileInput" accept=".jsonl" title="Static fallback file loader">
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="sidebar" id="sidebar">
+      <!-- Items injectados acá -->
+    </div>
+    
+    <div class="resizer" id="resizer"></div>
+    
+    <div class="main-view">
+      <div class="detail-panel" id="detailPanel">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          <p>Please load a transcript.jsonl file</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conversations Modal -->
+  <div id="convModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+      <h2>Conversations</h2>
+      <p class="modal-desc">Scanning the selected Brain directory. Select a conversation to start live-syncing.</p>
+      
+      <div id="convList" class="conv-list">
+        <!-- Injected items -->
+      </div>
+      
+      <div style="text-align: right;">
+        <button onclick="document.getElementById('convModal').style.display='none'">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let messages = [];
+    let types = new Set();
+    
+    const fileInput = document.getElementById('fileInput');
+    const liveOpenBtn = document.getElementById('liveOpenBtn');
+    const brainDirBtn = document.getElementById('brainDirBtn');
+    const modernButtons = document.getElementById('modernButtons');
+    const liveIndicator = document.getElementById('liveIndicator');
+    const sidebar = document.getElementById('sidebar');
+    const resizer = document.getElementById('resizer');
+    const detailPanel = document.getElementById('detailPanel');
+    const typeFilter = document.getElementById('typeFilter');
+    const convModal = document.getElementById('convModal');
+    const convList = document.getElementById('convList');
+    
+    // Check if modern File System Access API is supported
+    if ('showOpenFilePicker' in window && 'showDirectoryPicker' in window) {
+      modernButtons.style.display = 'flex';
+      fileInput.style.display = 'none'; // Hide legacy input
+    }
+
+    // Live Sync Logic
+    let fileHandle = null;
+    let lastModified = 0;
+    let syncInterval = null;
+
+    liveOpenBtn.addEventListener('click', async () => {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSONL Transcripts', accept: { 'text/plain': ['.jsonl'] } }],
+          multiple: false
+        });
+        await activateFileHandle(handle);
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error(err);
+      }
+    });
+
+    brainDirBtn.addEventListener('click', async () => {
+      try {
+        const dirHandle = await window.showDirectoryPicker({
+          id: 'antigravity-brain',
+          mode: 'read'
+        });
+        
+        convModal.style.display = 'flex';
+        convList.innerHTML = `<div class="loading-spinner"><div class="spinner"></div>Scanning folders...</div>`;
+        
+        const conversations = [];
+        
+        // Scan directory (only looking 1 level deep for conversation UUIDs)
+        for await (const [name, handle] of dirHandle.entries()) {
+          if (handle.kind === 'directory') {
+            try {
+              const sysGenHandle = await handle.getDirectoryHandle('.system_generated');
+              const logsHandle = await sysGenHandle.getDirectoryHandle('logs');
+              const tHandle = await logsHandle.getFileHandle('transcript.jsonl');
+              
+              const file = await tHandle.getFile();
+              
+              // Read first 8000 bytes to guess title
+              const slice = file.slice(0, 8000);
+              const text = await slice.text();
+              
+              let title = "Unknown Conversation";
+              let project = "";
+              
+              // Extract USER_REQUEST for title
+              const userReqRegex = new RegExp("<USER_REQUEST>\\\\n([\\\\s\\\\S]*?)\\\\n</USER_REQUEST>");
+              const userReqMatch = text.match(userReqRegex);
+              if (userReqMatch && userReqMatch[1]) {
+                title = userReqMatch[1].trim().substring(0, 65).replace(/\\n/g, ' ');
+                if (userReqMatch[1].trim().length > 65) title += "...";
+              } else {
+                // Fallback to searching first content string
+                const contentMatch = text.match(/"type":"USER_INPUT".*?"content":"([\\s\\S]*?)"/);
+                if (contentMatch && contentMatch[1]) {
+                   title = contentMatch[1].replace(/\\\\n/g, ' ').substring(0, 65);
+                   if (contentMatch[1].length > 65) title += "...";
+                }
+              }
+              
+              // Calculate Age
+              const daysOld = Math.floor((Date.now() - file.lastModified) / (1000 * 60 * 60 * 24));
+              let ageStr = daysOld === 0 ? "Today" : (daysOld === 1 ? "1 day ago" : daysOld + " days ago");
+
+              conversations.push({
+                id: name,
+                title: title,
+                lastModified: file.lastModified,
+                age: ageStr,
+                fileHandle: tHandle,
+                size: (file.size / 1024).toFixed(1) + ' KB'
+              });
+            } catch (e) {
+              // Ignore folders that don't have the expected Antigravity transcript structure
+            }
+          }
+        }
+        
+        conversations.sort((a, b) => b.lastModified - a.lastModified);
+        
+        if (conversations.length === 0) {
+          convList.innerHTML = `<div style="padding: 2rem; text-align:center; color: var(--text-muted);">No transcripts found in this directory. Ensure you selected a valid 'brain' or '.gemini' folder.</div>`;
+          return;
+        }
+
+        convList.innerHTML = '';
+        conversations.forEach(conv => {
+          const item = document.createElement('div');
+          item.className = 'conv-item';
+          item.innerHTML = `
+            <div style="flex:1; overflow:hidden;">
+              <div class="conv-title">${escapeHtml(conv.title)}</div>
+              <div class="conv-meta">
+                <span>${conv.age}</span>
+                <span style="font-family:'JetBrains Mono',monospace; opacity:0.7;">${conv.id.split('-')[0]}</span>
+              </div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); white-space:nowrap; margin-left:1rem;">
+              ${conv.size}
+            </div>
+          `;
+          item.onclick = () => {
+            convModal.style.display = 'none';
+            activateFileHandle(conv.fileHandle);
+          };
+          convList.appendChild(item);
+        });
+        
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          alert("Error opening directory: " + err.message);
+        }
+      }
+    });
+
+    async function activateFileHandle(handle) {
+      fileHandle = handle;
+      lastModified = 0; // force full reload
+      
+      document.querySelectorAll('.btn-primary, .btn-secondary').forEach(b => {
+        b.classList.remove('active-sync');
+      });
+      document.getElementById('liveOpenBtn').classList.add('active-sync');
+      document.getElementById('liveOpenBtn').querySelector('span').innerText = 'Syncing...';
+      
+      liveIndicator.style.display = 'block';
+      
+      await checkAndLoadFile();
+      
+      if (syncInterval) clearInterval(syncInterval);
+      syncInterval = setInterval(checkAndLoadFile, 1500); // Check every 1.5s
+    }
+
+    async function checkAndLoadFile() {
+      if (!fileHandle) return;
+      try {
+        const file = await fileHandle.getFile();
+        if (file.lastModified > lastModified) {
+          lastModified = file.lastModified;
+          const text = await file.text();
+          
+          const activeEl = sidebar.querySelector('.message-item.active');
+          const selectedIdx = activeEl ? activeEl.dataset.index : null;
+          
+          parseJSONL(text);
+          
+          if (selectedIdx !== null) {
+            const elToRestore = sidebar.querySelector(`.message-item[data-index="${selectedIdx}"]`);
+            if (elToRestore) {
+              elToRestore.classList.add('active');
+              showDetail(messages[parseInt(selectedIdx)], elToRestore, false);
+            }
+          } else {
+             sidebar.scrollTop = sidebar.scrollHeight;
+          }
+        }
+      } catch (err) {
+        console.error("Error reading file during sync", err);
+      }
+    }
+
+    // Fallback Input Logic
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        parseJSONL(text);
+      };
+      reader.readAsText(file);
+    });
+
+    // Theme toggle
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlElement = document.documentElement;
+    const moonIcon = document.getElementById('moonIcon');
+    const sunIcon = document.getElementById('sunIcon');
+    
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = htmlElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      htmlElement.setAttribute('data-theme', newTheme);
+      
+      if (newTheme === 'dark') {
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+      } else {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+      }
+    });
+    
+    // Panel Resizing Logic
+    let isResizing = false;
+    
+    resizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none'; 
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const minWidth = 150;
+      const maxWidth = window.innerWidth - 300;
+      let newWidth = e.clientX;
+      if (newWidth < minWidth) newWidth = minWidth;
+      if (newWidth > maxWidth) newWidth = maxWidth;
+      sidebar.style.width = newWidth + 'px';
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+
+    typeFilter.addEventListener('change', () => {
+      renderSidebar();
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (convModal.style.display === 'flex') return;
+      
+      const activeElement = sidebar.querySelector('.message-item.active');
+      if (!activeElement) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = activeElement.nextElementSibling;
+        if (next) {
+          next.click();
+          next.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = activeElement.previousElementSibling;
+        if (prev) {
+          prev.click();
+          prev.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    });
+
+    function parseJSONL(text) {
+      const lines = text.split('\n');
+      messages = [];
+      types.clear();
+      
+      lines.forEach((line, index) => {
+        if (!line.trim()) return;
+        try {
+          const parsed = JSON.parse(line);
+          messages.push(parsed);
+          if (parsed.type) types.add(parsed.type);
+        } catch (e) {
+          console.error("Error parsing line " + index, e);
+        }
+      });
+
+      updateFilterDropdown();
+      renderSidebar();
+    }
+
+    function updateFilterDropdown() {
+      const currentVal = typeFilter.value;
+      typeFilter.innerHTML = '<option value="ALL">All Types</option>';
+      
+      Array.from(types).sort().forEach(type => {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = type;
+        typeFilter.appendChild(opt);
+      });
+      
+      if (types.has(currentVal)) {
+        typeFilter.value = currentVal;
+      }
+    }
+
+    function getBadgeClass(type) {
+      if (!type) return 'system';
+      const t = type.toUpperCase();
+      if (t.includes('USER')) return 'user';
+      if (t.includes('MODEL') || t.includes('PLANNER')) return 'model';
+      if (t.includes('TOOL') || t.includes('ACTION')) return 'tool';
+      if (t.includes('ERROR')) return 'error';
+      return 'system';
+    }
+
+    function renderSidebar() {
+      sidebar.innerHTML = '';
+      const filter = typeFilter.value;
+      
+      messages.forEach((msg, idx) => {
+        if (filter !== 'ALL' && msg.type !== filter) return;
+
+        const div = document.createElement('div');
+        div.className = 'message-item';
+        div.dataset.index = idx; // Store true index
+        div.onclick = () => showDetail(msg, div, true);
+        
+        const badgeClass = getBadgeClass(msg.type);
+        const snippet = msg.content ? msg.content.substring(0, 60).replace(/\n/g, ' ') : (msg.tool_calls ? `[${msg.tool_calls.length} Tool Calls]` : 'No content');
+
+        div.innerHTML = `
+          <div class="message-header">
+            <span class="badge ${badgeClass}">${msg.type || 'UNKNOWN'}</span>
+            <span class="step-index">#${msg.step_index ?? idx}</span>
+          </div>
+          <div class="message-snippet">${snippet}</div>
+        `;
+        
+        sidebar.appendChild(div);
+      });
+      
+      if (!sidebar.querySelector('.message-item.active')) {
+        const firstItem = sidebar.querySelector('.message-item');
+        if (firstItem) firstItem.click();
+      }
+    }
+
+    function showDetail(msg, element, updateActiveState = true) {
+      if (updateActiveState) {
+        document.querySelectorAll('.message-item').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+      }
+
+      const badgeClass = getBadgeClass(msg.type);
+      const isTruncated = msg.is_truncated ? '<span style="color:var(--color-error);font-size:0.8em;margin-left:10px;">(Truncated)</span>' : '';
+
+      let contentHtml = '';
+      if (msg.content) {
+        contentHtml += `<div class="detail-content">${escapeHtml(msg.content)}</div>`;
+      }
+
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        contentHtml += '<h3 style="margin-bottom:1rem;">Tool Calls:</h3>';
+        msg.tool_calls.forEach(tc => {
+          contentHtml += `<div class="detail-content"><strong>${tc.name || 'Tool'}</strong>\n\n${escapeHtml(JSON.stringify(tc.arguments || tc, null, 2))}</div>`;
+        });
+      }
+
+      detailPanel.innerHTML = `
+        <div class="detail-header">
+          <h2><span class="badge ${badgeClass}">${msg.type || 'UNKNOWN'}</span> Step ${msg.step_index ?? '?'} ${isTruncated}</h2>
+          <div style="color:var(--text-muted); margin-top:0.5rem; font-size:0.9rem;">Source: ${msg.source || 'N/A'} | Status: ${msg.status || 'N/A'}</div>
+        </div>
+        ${contentHtml}
+        <h3 style="margin-top:2rem;margin-bottom:1rem;color:var(--text-muted);">Raw JSON Data</h3>
+        <pre class="json-view">${syntaxHighlight(JSON.stringify(msg, null, 2))}</pre>
+      `;
+    }
+
+    function escapeHtml(unsafe) {
+      return (unsafe || '').toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function syntaxHighlight(json) {
+      json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = 'json-number';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key';
+          } else {
+            cls = 'json-string';
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+          cls = 'json-boolean';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+      });
+    }
+  </script>
+</body>
+</html>
