@@ -344,15 +344,10 @@
       
       <!-- Modern API Buttons -->
       <div id="modernButtons" style="display:none; gap:1rem; align-items:center;">
-        <div style="display:flex;">
-          <button id="brainDirBtn" class="btn-secondary" title="Scan the saved brain directory for previous sessions" style="border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-            <span>Scan Brain Folder</span>
-          </button>
-          <button id="changeBrainBtn" class="btn-secondary" title="Select a different brain folder" style="border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 0.5rem; padding-right: 0.5rem;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;"><path d="M2 12h4l2-2h8l2 2h4"></path><path d="M2 22h20"></path><path d="M12 2v8"></path><path d="M8 6l4-4 4 4"></path></svg>
-          </button>
-        </div>
+        <button id="brainDirBtn" class="btn-secondary" title="Open the entire brain directory to select from previous sessions">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <span>Select Brain Folder</span>
+        </button>
         <button id="liveOpenBtn" class="btn-primary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg> 
           <span>Open Single File</span>
@@ -404,7 +399,6 @@
     const fileInput = document.getElementById('fileInput');
     const liveOpenBtn = document.getElementById('liveOpenBtn');
     const brainDirBtn = document.getElementById('brainDirBtn');
-    const changeBrainBtn = document.getElementById('changeBrainBtn');
     const modernButtons = document.getElementById('modernButtons');
     const liveIndicator = document.getElementById('liveIndicator');
     const sidebar = document.getElementById('sidebar');
@@ -414,29 +408,6 @@
     const convModal = document.getElementById('convModal');
     const convList = document.getElementById('convList');
     
-    // IndexedDB for saving directory handle
-    const idb = {
-      db: new Promise((resolve, reject) => {
-        const req = indexedDB.open('LoglensDB', 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror = () => resolve(null);
-      }),
-      async get(key) {
-        const db = await this.db;
-        if (!db) return null;
-        return new Promise(resolve => {
-          const req = db.transaction('handles', 'readonly').objectStore('handles').get(key);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => resolve(null);
-        });
-      },
-      async set(key, val) {
-        const db = await this.db;
-        if (db) db.transaction('handles', 'readwrite').objectStore('handles').put(val, key);
-      }
-    };
-
     // Check if modern File System Access API is supported
     if ('showOpenFilePicker' in window && 'showDirectoryPicker' in window) {
       modernButtons.style.display = 'flex';
@@ -460,29 +431,10 @@
       }
     });
 
-    changeBrainBtn.addEventListener('click', async () => {
-      try {
-        const dirHandle = await window.showDirectoryPicker({ id: 'loglens-brain', mode: 'read' });
-        await idb.set('brainDir', dirHandle);
-        await scanDirectory(dirHandle);
-      } catch (err) {
-        if (err.name !== 'AbortError') console.error(err);
-      }
-    });
-
     brainDirBtn.addEventListener('click', async () => {
       try {
-        let dirHandle = await idb.get('brainDir');
-        if (dirHandle) {
-          const perm = await dirHandle.requestPermission({ mode: 'read' });
-          if (perm !== 'granted') dirHandle = null;
-        }
-        
-        if (!dirHandle) {
-          dirHandle = await window.showDirectoryPicker({ id: 'loglens-brain', mode: 'read' });
-          await idb.set('brainDir', dirHandle);
-        }
-        
+        // Using id: 'loglens-brain' allows the browser to natively remember the last selected location for this ID
+        const dirHandle = await window.showDirectoryPicker({ id: 'loglens-brain', mode: 'read' });
         await scanDirectory(dirHandle);
       } catch (err) {
         if (err.name !== 'AbortError') {
