@@ -17,6 +17,23 @@ Loglens is a lightweight, standalone, single-page web application for inspecting
 3. Browse the inferred conversations and select one to begin live-syncing.
 4. Alternatively, use **Open Single File** to pick a specific `.jsonl` transcript.
 
+## Supported Formats
+
+Loglens automatically detects the source of the `.jsonl` log file and maps its internal structure into a unified, clean interface. The currently supported log formats are:
+
+### 1. Antigravity / OpenCode
+These systems produce logs with explicit state machine tracking. Loglens displays the native message types and sources.
+- **Typical Message Types:** `USER_INPUT`, `PLANNER_RESPONSE`, `CHECKPOINT`, `TOOL_RESPONSE`.
+- **Typical Sources:** `USER_EXPLICIT`, `MODEL`, `SYSTEM`.
+- **Note:** Tool executions are properly parsed and displayed in the right-hand detail panel.
+
+### 2. Claude Desktop (`claude-desktop`)
+Claude Desktop local logs (`.jsonl`) use a different schema, but Loglens normalizes them to match the visual UI format.
+- **Typical Message Types:** `USER`, `ASSISTANT`, `ATTACHMENT`.
+- **Note:** Internally, Claude logs use a nested `message.content` array. Loglens automatically parses text blocks and `tool_use` blocks, allowing you to read Claude's internal tool arguments in a structured way without digging through raw JSON arrays.
+
+*You can find mocked sample logs for both formats in the `examples/` directory.*
+
 ## Development
 
 Loglens is intentionally built as a self-contained vanilla HTML/JS/CSS tool to ensure maximal portability. See `AGENTS.md` for our strict development rules and `scenarios.md` for common usage patterns.

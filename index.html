@@ -332,7 +332,7 @@
 <body>
 
   <header>
-    <h1>Loglens <div class="live-indicator" id="liveIndicator" title="Live Sync Active"></div></h1>
+    <h1>Loglens <span id="logFormatBadge" class="badge" style="font-size:0.5em; background:#374151; display:none; vertical-align:middle; margin-left:10px; font-weight:normal;"></span><div class="live-indicator" id="liveIndicator" title="Live Sync Active"></div></h1>
     <div class="controls">
       <button id="themeToggle" title="Toggle Light/Dark Theme">
         <svg id="moonIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -401,6 +401,7 @@
     const brainDirBtn = document.getElementById('brainDirBtn');
     const modernButtons = document.getElementById('modernButtons');
     const liveIndicator = document.getElementById('liveIndicator');
+    const logFormatBadge = document.getElementById('logFormatBadge');
     const sidebar = document.getElementById('sidebar');
     const resizer = document.getElementById('resizer');
     const detailPanel = document.getElementById('detailPanel');
@@ -731,10 +732,18 @@
       messages = [];
       types.clear();
       
+      let guessedFormat = "Unknown";
+      
       lines.forEach((line, index) => {
         if (!line.trim()) return;
         try {
           const parsed = JSON.parse(line);
+          
+          if (guessedFormat === "Unknown") {
+             if (parsed.entrypoint === 'claude-desktop') guessedFormat = "Claude Desktop";
+             else if (parsed.step_index !== undefined || parsed.source) guessedFormat = "Antigravity";
+          }
+          
           const unified = getUnifiedMessage(parsed, index);
           messages.push(unified);
           if (unified.type) types.add(unified.type);
@@ -742,6 +751,13 @@
           console.error("Error parsing line " + index, e);
         }
       });
+      
+      if (messages.length > 0) {
+        logFormatBadge.style.display = 'inline-block';
+        logFormatBadge.textContent = guessedFormat;
+      } else {
+        logFormatBadge.style.display = 'none';
+      }
 
       updateFilterDropdown();
       renderSidebar();
