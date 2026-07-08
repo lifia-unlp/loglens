@@ -681,6 +681,51 @@
       }
     });
 
+    function getUnifiedMessage(msg, index) {
+      if (msg.entrypoint === 'claude-desktop') {
+        let content = '';
+        let tool_calls = [];
+        
+        if (msg.message && msg.message.content) {
+          if (typeof msg.message.content === 'string') {
+            content = msg.message.content;
+          } else if (Array.isArray(msg.message.content)) {
+            msg.message.content.forEach(c => {
+              if (c.type === 'text') content += c.text + '\n';
+              if (c.type === 'tool_use') {
+                tool_calls.push({ name: c.name, args: c.input });
+              }
+            });
+          }
+        } else if (msg.type === 'attachment' && msg.attachment) {
+          content = typeof msg.attachment === 'string' ? msg.attachment : JSON.stringify(msg.attachment, null, 2);
+        }
+
+        return {
+          step_index: index,
+          type: (msg.type || 'UNKNOWN').toUpperCase(),
+          source: msg.type === 'user' ? 'USER' : (msg.type === 'assistant' ? 'CLAUDE' : 'SYSTEM'),
+          status: msg.message?.stop_reason || 'DONE',
+          created_at: msg.timestamp || 'N/A',
+          content: content,
+          tool_calls: tool_calls,
+          raw: msg
+        };
+      }
+      
+      // Default Antigravity / OpenCode
+      return {
+        step_index: msg.step_index ?? index,
+        type: msg.type || 'UNKNOWN',
+        source: msg.source || 'N/A',
+        status: msg.status || 'N/A',
+        created_at: msg.created_at || 'N/A',
+        content: msg.content,
+        tool_calls: msg.tool_calls || [],
+        raw: msg
+      };
+    }
+
     function parseJSONL(text) {
       const lines = text.split('\n');
       messages = [];
@@ -690,8 +735,9 @@
         if (!line.trim()) return;
         try {
           const parsed = JSON.parse(line);
-          messages.push(parsed);
-          if (parsed.type) types.add(parsed.type);
+          const unified = getUnifiedMessage(parsed, index);
+          messages.push(unified);
+          if (unified.type) types.add(unified.type);
         } catch (e) {
           console.error("Error parsing line " + index, e);
         }
@@ -776,7 +822,7 @@
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         contentHtml += '<h3 style="margin-bottom:1rem;">Tool Calls:</h3>';
         msg.tool_calls.forEach(tc => {
-          contentHtml += `<div class="detail-content"><strong>${tc.name || 'Tool'}</strong>\n\n${escapeHtml(JSON.stringify(tc.arguments || tc, null, 2))}</div>`;
+          contentHtml += `<div class="detail-content"><strong>${tc.name || 'Tool'}</strong>\n\n${escapeHtml(JSON.stringify(tc.args || tc.arguments || tc, null, 2))}</div>`;
         });
       }
 
@@ -787,7 +833,7 @@
         </div>
         ${contentHtml}
         <h3 style="margin-top:2rem;margin-bottom:1rem;color:var(--text-muted);">Raw JSON Data</h3>
-        <pre class="json-view">${syntaxHighlight(JSON.stringify(msg, null, 2))}</pre>
+        <pre class="json-view">${syntaxHighlight(JSON.stringify(msg.raw, null, 2))}</pre>
       `;
     }
 
